@@ -39,6 +39,7 @@ async function run() {
     const usersCollection = client.db('adoptly').collection('users')
     const petCollection = client.db('adoptly').collection('pets')
     const donationCollection = client.db('adoptly').collection('donation')
+    const adoptPetCollection = client.db('adoptly').collection('adopt-pet')
 
     const verifyToken = (req, res, next) => {
       // console.log("inside verify token", req.headers.authorization);
@@ -55,13 +56,13 @@ async function run() {
         next()
       })
     }
-   
+
 
     app.post('/jwt', async (req, res) => {
       const user = req.body;
       const token = jwt.sign(user, process.env.JWT_SECRET, { expiresIn: '24h' })
 
-      res.send({token})
+      res.send({ token })
 
     })
 
@@ -106,10 +107,26 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/pets', verifyToken, async (req, res) => {
+    app.get('/pets', async (req, res) => {
       const user = req.query.email;
+      const category = req.query.category;
+      const search = req.query.search;
+      console.log(category, search);
+      let result;
+      if (user)
+        result = await petCollection.find({ user: user }).toArray()
+      else if (category && search) {
+        const searchFilter = { name: { $regex: search, $options: 'i' } }; // Case-insensitive search
+        const query = category === 'all'
+          ? searchFilter // If category is 'all', only apply the search filter
+          : { category, ...searchFilter }; // Apply both category and search filter
 
-      const result = await petCollection.find({ user: user }).toArray()
+        result = await petCollection.find(query).toArray();
+      }
+      else {
+        result = await petCollection.find({ adopted: false }).sort({ date: -1 }).toArray()
+
+      }
 
       res.send(result)
     })
@@ -169,8 +186,13 @@ async function run() {
       const email = req.query.email;
       const query = { user: email }
       console.log(email);
-      const result = await donationCollection.find(query).toArray()
-      console.log(result);
+      let result;
+      if(email)
+        result = await donationCollection.find(query).toArray()
+      else{
+        result = await donationCollection.find().toArray()
+      }
+
       res.send(result)
     })
 
@@ -212,17 +234,17 @@ async function run() {
 
       next()
     }
-    app.get('/allusers', verifyToken, verifyAdmin,  async (req, res) => {
-      
+    app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
+
       const result = await usersCollection.find().toArray()
       res.send(result)
     })
 
-    app.patch('/user-role-update', verifyToken, verifyAdmin, async(req, res)=>{
+    app.patch('/user-role-update', verifyToken, verifyAdmin, async (req, res) => {
       const data = req.body;
-      const filter = {_id:new ObjectId(data.id)}
+      const filter = { _id: new ObjectId(data.id) }
       const updateDoc = {
-        $set:{
+        $set: {
           role: 'admin'
         }
       }
@@ -231,53 +253,60 @@ async function run() {
     })
 
     // all pets
-    app.get('/allpets', async(req, res)=>{
+    app.get('/allpets', async (req, res) => {
       const result = await petCollection.find().toArray()
       res.send(result)
     })
 
     // pet delete
-    app.delete('/pet-delete/:id', verifyToken, verifyAdmin, async(req, res)=>{
+    app.delete('/pet-delete/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const result = await petCollection.deleteOne({_id: new ObjectId(id)})
+      const result = await petCollection.deleteOne({ _id: new ObjectId(id) })
       res.send(result)
     })
 
-    app.patch('/update-pet-status', verifyToken, verifyAdmin, async(req, res)=>{
+    app.patch('/update-pet-status', verifyToken, verifyAdmin, async (req, res) => {
       const data = req.body;
-      const filter = {_id: new ObjectId(data.id)}
+      const filter = { _id: new ObjectId(data.id) }
       const updateDoc = {
-        $set:{
+        $set: {
           adopted: data.status ? false : true
         }
       }
       const result = await petCollection.updateOne(filter, updateDoc)
       res.send(result)
-     })
+    })
 
     //  all donations
-    app.get('/all-donation', verifyToken, verifyAdmin, async(req, res)=>{
+    app.get('/all-donation', verifyToken, verifyAdmin, async (req, res) => {
       const result = await donationCollection.find().toArray()
       res.send(result)
     })
 
-    app.delete('/donation-delete/:id', verifyToken, verifyAdmin, async(req, res)=>{
+    app.delete('/donation-delete/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
-      const result = await donationCollection.deleteOne({_id: new ObjectId(id)})
+      const result = await donationCollection.deleteOne({ _id: new ObjectId(id) })
       res.send(result)
     })
 
-    app.patch('/update-donation-status', verifyToken, verifyAdmin, async(req, res)=>{
+    app.patch('/update-donation-status', verifyToken, verifyAdmin, async (req, res) => {
       const data = req.body;
-      const filter = {_id: new ObjectId(data.id)}
+      const filter = { _id: new ObjectId(data.id) }
       const updateDoc = {
-        $set:{
+        $set: {
           pause: data.status ? false : true
         }
       }
       const result = await donationCollection.updateOne(filter, updateDoc)
       res.send(result)
-     })
+    })
+
+    // adopt pet 
+    app.post('/adopt', verifyToken, async(req, res)=>{
+      const data = req.body;
+      const result = await adoptPetCollection.insertOne(data)
+      res.send(result)
+    })
 
 
     // Send a ping to confirm a successful connection
