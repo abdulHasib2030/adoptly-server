@@ -106,8 +106,9 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/pets', async (req, res) => {
+    app.get('/pets', verifyToken, async (req, res) => {
       const user = req.query.email;
+
       const result = await petCollection.find({ user: user }).toArray()
 
       res.send(result)
