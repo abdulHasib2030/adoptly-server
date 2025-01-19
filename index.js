@@ -1,16 +1,17 @@
 require('dotenv').config();
 
 const express = require('express');
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const cors = require('cors');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const jwt = require('jsonwebtoken')
 const cookieParser = require('cookie-parser')
-
+const bodyParser = require('body-parser');
 
 const app = express();
 app.use(
   cors({
-    origin: 'http://localhost:5173',
+    origin:[ 'http://localhost:5173','https://stripe.com'],
     credentials: true, // Allow cookies
   })
 );
@@ -18,7 +19,7 @@ app.use(
 const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cookieParser())
-
+app.use(bodyParser.json()); 
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.kpzks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -40,6 +41,7 @@ async function run() {
     const petCollection = client.db('adoptly').collection('pets')
     const donationCollection = client.db('adoptly').collection('donation')
     const adoptPetCollection = client.db('adoptly').collection('adopt-pet')
+    const paymentCollection = client.db('adoptly').collection('payment')
 
     const verifyToken = (req, res, next) => {
       // console.log("inside verify token", req.headers.authorization);
@@ -192,6 +194,7 @@ async function run() {
       else{
         result = await donationCollection.find().toArray()
       }
+    
 
       res.send(result)
     })
@@ -199,7 +202,8 @@ async function run() {
     app.get('/donation/:id',  async(req, res)=>{
       const id = req.params.id;
       const result = await donationCollection.findOne({_id:new ObjectId(id)})
-      res.send(result)
+      const recomDonation = await donationCollection.find({pause: false}).limit(3).toArray()
+      res.send({result, recomDonation})
     })
 
     // update and get
@@ -314,6 +318,25 @@ async function run() {
       res.send(result)
     })
 
+    // payment option
+    app.post('/create-payment-intent', verifyToken, async(req, res)=>{
+      const {amount} = req.body;
+      const totalAmount = parseInt(amount*100);
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount:totalAmount,
+        currency:'usd',
+        // payment_method_types: ['card']
+      })
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      })
+    })
+
+    app.post('/payment-success', verifyToken, async(req, res)=>{
+      const data = req.body;
+      const result = await paymentCollection.insertOne(data)
+      res.send(result)
+    })
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
