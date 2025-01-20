@@ -47,14 +47,15 @@ async function run() {
     // verify admin
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-      next()
+   
       const query = { email: email }
       const user = await usersCollection.findOne(query)
       const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
        
         return res.status(403).send({ message: "forbidden access" })
-      }
+      }   
+      next()
 
     }
 
@@ -199,7 +200,7 @@ async function run() {
       res.send(result)
     })
     // delete pet
-    app.delete('/delete-pet/:id', async (req, res) => {
+    app.delete('/delete-pet/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await petCollection.deleteOne(query)
@@ -207,11 +208,18 @@ async function run() {
     })
 
     // donation 
-    app.post('/add-donation', async (req, res) => {
+    app.post('/add-donation', verifyToken, async (req, res) => {
       const query = req.query.email;
       const data = req.body;
       const result = await donationCollection.insertOne(data)
       res.send(result)
+    })
+
+    app.get('/my-added-donation', verifyToken, async(req, res)=>{
+      const email = req.query.email;
+      const query = { user: email }
+     const result = await donationCollection.find(query).toArray()
+     res.send(result)
     })
 
     app.get('/donation', async (req, res) => {
@@ -244,9 +252,10 @@ async function run() {
       res.send(result)
     })
 
-    app.put('/update-donation', async (req, res) => {
+    app.patch('/update-donation', verifyToken, async (req, res) => {
       const data = req.body;
-      const filter = { _id: data.id }
+      const filter = { _id: new ObjectId(data.id)}
+      
       const updateDoc = {
         $set: {
           image: data.image,
@@ -255,7 +264,7 @@ async function run() {
           lst_date: data.lst_date,
           shortDescription: data.shortDescription,
           description: data.description,
-          lst_update: data.lst_update,
+
         }
       }
       const result = await donationCollection.updateOne(filter, updateDoc)
@@ -283,7 +292,7 @@ async function run() {
     })
 
     // all pets
-    app.get('/allpets', async (req, res) => {
+    app.get('/allpets',verifyToken, verifyAdmin, async (req, res) => {
       const result = await petCollection.find().toArray()
       res.send(result)
     })
@@ -341,7 +350,7 @@ async function run() {
     // payment option
     app.post('/create-payment-intent', verifyToken, async(req, res)=>{
       const {amount} = req.body;
-      const totalAmount = parseInt(amount*100);
+      const totalAmount = parseInt(amount);
       const paymentIntent = await stripe.paymentIntents.create({
         amount:totalAmount,
         currency:'usd',
@@ -410,7 +419,7 @@ console.log(result);
         const dataDoc = {
           image: donationData.image,
           name: donationData.name,
-          donation: donationData.donation,
+          donation: i.amount,
           payment_id:i._id
 
         }
