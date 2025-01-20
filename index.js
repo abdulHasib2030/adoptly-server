@@ -23,7 +23,7 @@ app.use(cors(
 const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cookieParser())
-app.use(bodyParser.json());
+// app.use(bodyParser.json());
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.kpzks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
