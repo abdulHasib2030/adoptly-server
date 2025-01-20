@@ -109,22 +109,27 @@ async function run() {
  
 
     //  ------------- add a pet ------------------//
-    app.post('/add-pet', async (req, res) => {
+    app.post('/add-pet', verifyToken, async (req, res) => {
       const data = req.body;
 
       const result = await petCollection.insertOne(data)
       res.send(result)
     })
 
-    app.get('/pets', async (req, res) => {
+    app.get('/my-pets', verifyToken, async(req, res)=>{
       const user = req.query.email;
+      const result = await petCollection.find({ user: user }).toArray()
+      res.send(result)
+    })
+
+    app.get('/pets', async (req, res) => {
+
       const category = req.query.category;
       const search = req.query.search;
       console.log(category, search);
       let result;
-      if (user)
-        result = await petCollection.find({ user: user }).toArray()
-      else if (category && search) {
+      
+      if (category && search) {
         const searchFilter = { name: { $regex: search, $options: 'i' } }; // Case-insensitive search
  
         let adopted = { adopted: false };
