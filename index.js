@@ -43,6 +43,21 @@ async function run() {
     const adoptPetCollection = client.db('adoptly').collection('adopt-pet')
     const paymentCollection = client.db('adoptly').collection('payment')
 
+      // Admin -------------------//
+    // verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      next()
+      const query = { email: email }
+      const user = await usersCollection.findOne(query)
+      const isAdmin = user?.role === 'admin';
+      if (!isAdmin) {
+       
+        return res.status(403).send({ message: "forbidden access" })
+      }
+
+    }
+
     const verifyToken = (req, res, next) => {
       // console.log("inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
@@ -91,15 +106,7 @@ async function run() {
 
     })
 
-    app.post('/logout', (req, res) => {
-      res.clearCookie('token', {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? "none" : "strict",
-
-      })
-        .send({ success: true })
-    })
+ 
 
     //  ------------- add a pet ------------------//
     app.post('/add-pet', async (req, res) => {
@@ -232,19 +239,8 @@ async function run() {
       res.send(result)
     })
 
-    // Admin -------------------//
-    // verify admin
-    const verifyAdmin = async (req, res, next) => {
-      const email = req.decoded.email;
-      const query = { email: email }
-      const user = await usersCollection.findOne(query)
-      const isAdmin = user?.role === 'admin';
-      if (!isAdmin) {
-        return res.status(403).send({ message: "forbidden access" })
-      }
+  
 
-      next()
-    }
     app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
 
       const result = await usersCollection.find().toArray()
@@ -300,7 +296,7 @@ async function run() {
       res.send(result)
     })
 
-    app.patch('/update-donation-status', verifyToken, verifyAdmin, async (req, res) => {
+    app.patch('/update-donation-status', verifyToken,  async (req, res) => {
       const data = req.body;
       const filter = { _id: new ObjectId(data.id) }
       const updateDoc = {
@@ -388,8 +384,22 @@ console.log(result);
       let result = []
       for (const i of paymentDon){
         const donationData = await donationCollection.findOne({_id: new ObjectId(i.donationId)})
-        result.push(donationData)
+        const dataDoc = {
+          image: donationData.image,
+          name: donationData.name,
+          donation: donationData.donation,
+          payment_id:i._id
+
+        }
+        result.push(dataDoc)
       }
+      res.send(result)
+    })
+
+    // donation delete 
+    app.delete('/delete-donation/:id', verifyToken, async(req, res)=>{
+      const id = req.params.id;
+      const result = await paymentCollection.deleteOne({_id: new ObjectId(id)})
       res.send(result)
     })
 
