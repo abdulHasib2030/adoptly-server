@@ -191,6 +191,7 @@ async function run() {
       let result;
       if(email)
         result = await donationCollection.find(query).toArray()
+       
       else{
         result = await donationCollection.find().toArray()
       }
@@ -335,6 +336,29 @@ async function run() {
     app.post('/payment-success', verifyToken, async(req, res)=>{
       const data = req.body;
       const result = await paymentCollection.insertOne(data)
+      const donationCam = await donationCollection.findOne({_id: new ObjectId(data.donationId)})
+      let collectDonatin = parseInt(donationCam.collectDonation )+ parseInt(data.amount)
+      
+      const updateDoc = {
+        $set:{
+          collectDonation: collectDonatin
+        }
+      }
+      const updateCollectDonA= await donationCollection.updateOne({_id: new ObjectId(data.donationId)}, updateDoc)
+      console.log(updateCollectDonA);
+      res.send(result)
+    })
+
+    app.get('/collect-donation/:id', async(req, res)=>{
+      const id = req.params.id;
+      const result = await paymentCollection.find({donationId: id}).toArray()
+      res.send(result)
+    })
+
+    app.get('/payment-user/:id', verifyToken, async(req, res)=>{
+      const id = req.params.id;
+      console.log(id);
+      const result = await paymentCollection.find({donationId:id}).toArray()
       res.send(result)
     })
 
