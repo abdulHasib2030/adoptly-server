@@ -9,17 +9,21 @@ const cookieParser = require('cookie-parser')
 const bodyParser = require('body-parser');
 
 const app = express();
-app.use(
-  cors({
-    origin:[ 'http://localhost:5173','https://stripe.com'],
-    credentials: true, // Allow cookies
-  })
-);
+app.use(cors(
+  {
+    origin: [
+      'http://localhost:5173',
+      'https://adoptly-908e3.firebaseapp.com',
+      'https://adoptly-908e3.web.app',
+    ],
+    credentials: true
+  }
+));
 // middleware
 const port = process.env.PORT || 5000;
 app.use(express.json());
 app.use(cookieParser())
-app.use(bodyParser.json()); 
+app.use(bodyParser.json());
 
 const uri = `mongodb+srv://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@cluster0.kpzks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -43,18 +47,18 @@ async function run() {
     const adoptPetCollection = client.db('adoptly').collection('adopt-pet')
     const paymentCollection = client.db('adoptly').collection('payment')
 
-      // Admin -------------------//
+    // Admin -------------------//
     // verify admin
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
-   
+
       const query = { email: email }
       const user = await usersCollection.findOne(query)
       const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
-       
+
         return res.status(403).send({ message: "forbidden access" })
-      }   
+      }
       next()
 
     }
@@ -107,7 +111,7 @@ async function run() {
 
     })
 
- 
+
 
     //  ------------- add a pet ------------------//
     app.post('/add-pet', verifyToken, async (req, res) => {
@@ -117,7 +121,7 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/my-pets', verifyToken, async(req, res)=>{
+    app.get('/my-pets', verifyToken, async (req, res) => {
       const user = req.query.email;
       const result = await petCollection.find({ user: user }).toArray()
       res.send(result)
@@ -129,14 +133,14 @@ async function run() {
       const search = req.query.search;
       console.log(category, search);
       let result;
-      
+
       if (category && search) {
         const searchFilter = { name: { $regex: search, $options: 'i' } }; // Case-insensitive search
- 
+
         let adopted = { adopted: false };
-         query = category === 'all'
-          ? {...adopted, ...searchFilter} // If category is 'all', only apply the search filter
-          : {...adopted,  category, ...searchFilter, }; // Apply both category and search filter
+        query = category === 'all'
+          ? { ...adopted, ...searchFilter } // If category is 'all', only apply the search filter
+          : { ...adopted, category, ...searchFilter, }; // Apply both category and search filter
 
         result = await petCollection.find(query).toArray();
       }
@@ -148,20 +152,20 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/category-all-pets', async(req, res)=>{
+    app.get('/category-all-pets', async (req, res) => {
       const category = req.query.category;
       console.log(category.toLowerCase());
       let result;
-      if(category){
+      if (category) {
         let adopted = { adopted: false };
-        result = await petCollection.find({category: category.toLowerCase(),  adopted: false }).toArray()
-        return  res.send(result)
+        result = await petCollection.find({ category: category.toLowerCase(), adopted: false }).toArray()
+        return res.send(result)
       }
-      else{
+      else {
         result = await petCollection.find({ adopted: false }).sort({ date: -1 }).toArray()
-        return  res.send(result)
+        return res.send(result)
       }
-     
+
     })
 
     app.get('/pet/:id', async (req, res) => {
@@ -215,11 +219,11 @@ async function run() {
       res.send(result)
     })
 
-    app.get('/my-added-donation', verifyToken, async(req, res)=>{
+    app.get('/my-added-donation', verifyToken, async (req, res) => {
       const email = req.query.email;
       const query = { user: email }
-     const result = await donationCollection.find(query).toArray()
-     res.send(result)
+      const result = await donationCollection.find(query).toArray()
+      res.send(result)
     })
 
     app.get('/donation', async (req, res) => {
@@ -227,26 +231,26 @@ async function run() {
       const query = { user: email }
       console.log(email);
       let result;
-      if(email)
+      if (email)
         result = await donationCollection.find(query).toArray()
-       
-      else{
+
+      else {
         result = await donationCollection.find().toArray()
       }
-    
+
 
       res.send(result)
     })
 
-    app.get('/donation/:id',  async(req, res)=>{
+    app.get('/donation/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await donationCollection.findOne({_id:new ObjectId(id)})
-      const recomDonation = await donationCollection.find({pause: false}).limit(3).toArray()
-      res.send({result, recomDonation})
+      const result = await donationCollection.findOne({ _id: new ObjectId(id) })
+      const recomDonation = await donationCollection.find({ pause: false }).limit(3).toArray()
+      res.send({ result, recomDonation })
     })
 
     // update and get
-    app.get('/update-donation/:id',  async (req, res) => {
+    app.get('/update-donation/:id', async (req, res) => {
       const id = req.params.id;
       const result = await donationCollection.findOne({ _id: new ObjectId(id) })
       res.send(result)
@@ -254,8 +258,8 @@ async function run() {
 
     app.patch('/update-donation', verifyToken, async (req, res) => {
       const data = req.body;
-      const filter = { _id: new ObjectId(data.id)}
-      
+      const filter = { _id: new ObjectId(data.id) }
+
       const updateDoc = {
         $set: {
           image: data.image,
@@ -271,7 +275,7 @@ async function run() {
       res.send(result)
     })
 
-  
+
 
     app.get('/allusers', verifyToken, verifyAdmin, async (req, res) => {
 
@@ -292,7 +296,7 @@ async function run() {
     })
 
     // all pets
-    app.get('/allpets',verifyToken, verifyAdmin, async (req, res) => {
+    app.get('/allpets', verifyToken, verifyAdmin, async (req, res) => {
       const result = await petCollection.find().toArray()
       res.send(result)
     })
@@ -328,7 +332,7 @@ async function run() {
       res.send(result)
     })
 
-    app.patch('/update-donation-status', verifyToken,  async (req, res) => {
+    app.patch('/update-donation-status', verifyToken, async (req, res) => {
       const data = req.body;
       const filter = { _id: new ObjectId(data.id) }
       const updateDoc = {
@@ -341,19 +345,19 @@ async function run() {
     })
 
     // adopt pet 
-    app.post('/adopt', verifyToken, async(req, res)=>{
+    app.post('/adopt', verifyToken, async (req, res) => {
       const data = req.body;
       const result = await adoptPetCollection.insertOne(data)
       res.send(result)
     })
 
     // payment option
-    app.post('/create-payment-intent', verifyToken, async(req, res)=>{
-      const {amount} = req.body;
+    app.post('/create-payment-intent', verifyToken, async (req, res) => {
+      const { amount } = req.body;
       const totalAmount = parseInt(amount);
       const paymentIntent = await stripe.paymentIntents.create({
-        amount:totalAmount,
-        currency:'usd',
+        amount: totalAmount,
+        currency: 'usd',
         // payment_method_types: ['card']
       })
       res.send({
@@ -361,66 +365,66 @@ async function run() {
       })
     })
 
-    app.post('/payment-success', verifyToken, async(req, res)=>{
+    app.post('/payment-success', verifyToken, async (req, res) => {
       const data = req.body;
       const result = await paymentCollection.insertOne(data)
-      const donationCam = await donationCollection.findOne({_id: new ObjectId(data.donationId)})
-      let collectDonatin = parseInt(donationCam.collectDonation )+ parseInt(data.amount)
-      
+      const donationCam = await donationCollection.findOne({ _id: new ObjectId(data.donationId) })
+      let collectDonatin = parseInt(donationCam.collectDonation) + parseInt(data.amount)
+
       const updateDoc = {
-        $set:{
+        $set: {
           collectDonation: collectDonatin
         }
       }
-      const updateCollectDonA= await donationCollection.updateOne({_id: new ObjectId(data.donationId)}, updateDoc)
+      const updateCollectDonA = await donationCollection.updateOne({ _id: new ObjectId(data.donationId) }, updateDoc)
       console.log(updateCollectDonA);
       res.send(result)
     })
 
-    app.get('/collect-donation/:id', async(req, res)=>{
+    app.get('/collect-donation/:id', async (req, res) => {
       const id = req.params.id;
-      const result = await paymentCollection.find({donationId: id}).toArray()
+      const result = await paymentCollection.find({ donationId: id }).toArray()
       res.send(result)
     })
 
-    app.get('/payment-user/:id', verifyToken, async(req, res)=>{
+    app.get('/payment-user/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
       console.log(id);
-      const result = await paymentCollection.find({donationId:id}).toArray()
+      const result = await paymentCollection.find({ donationId: id }).toArray()
       res.send(result)
     })
 
-    app.get('/adoption-request', verifyToken, async(req, res)=>{
+    app.get('/adoption-request', verifyToken, async (req, res) => {
       const email = req.query.email
-      const petData = await petCollection.find({user:email, adopted: false}).toArray()
+      const petData = await petCollection.find({ user: email, adopted: false }).toArray()
       let result = [];
-      for(const i of petData){
-        const adoptUser = await adoptPetCollection.find({petId: i._id.toString()}).toArray()
+      for (const i of petData) {
+        const adoptUser = await adoptPetCollection.find({ petId: i._id.toString() }).toArray()
         result.push(adoptUser)
       }
-console.log(result);
+      console.log(result);
       res.send(result)
     })
 
-    app.delete('/reject-adoption-request/:id', verifyToken, async(req, res)=>{
+    app.delete('/reject-adoption-request/:id', verifyToken, async (req, res) => {
       const id = req.params.id
-      
-      const result = await adoptPetCollection.deleteOne({_id: new ObjectId(id)})
+
+      const result = await adoptPetCollection.deleteOne({ _id: new ObjectId(id) })
       res.send(result)
     })
 
     // my donation 
-    app.get('/my-donations', verifyToken, async(req, res)=>{
+    app.get('/my-donations', verifyToken, async (req, res) => {
       const email = req.query.email;
-      const paymentDon = await paymentCollection.find({email:email}).toArray()
+      const paymentDon = await paymentCollection.find({ email: email }).toArray()
       let result = []
-      for (const i of paymentDon){
-        const donationData = await donationCollection.findOne({_id: new ObjectId(i.donationId)})
+      for (const i of paymentDon) {
+        const donationData = await donationCollection.findOne({ _id: new ObjectId(i.donationId) })
         const dataDoc = {
           image: donationData.image,
           name: donationData.name,
           donation: i.amount,
-          payment_id:i._id
+          payment_id: i._id
 
         }
         result.push(dataDoc)
@@ -429,9 +433,9 @@ console.log(result);
     })
 
     // donation delete 
-    app.delete('/delete-donation/:id', verifyToken, async(req, res)=>{
+    app.delete('/delete-donation/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
-      const result = await paymentCollection.deleteOne({_id: new ObjectId(id)})
+      const result = await paymentCollection.deleteOne({ _id: new ObjectId(id) })
       res.send(result)
     })
 
