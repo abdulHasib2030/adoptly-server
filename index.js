@@ -126,9 +126,11 @@ async function run() {
         result = await petCollection.find({ user: user }).toArray()
       else if (category && search) {
         const searchFilter = { name: { $regex: search, $options: 'i' } }; // Case-insensitive search
-        const query = category === 'all'
-          ? searchFilter // If category is 'all', only apply the search filter
-          : { category, ...searchFilter }; // Apply both category and search filter
+ 
+        let adopted = { adopted: false };
+         query = category === 'all'
+          ? {...adopted, ...searchFilter} // If category is 'all', only apply the search filter
+          : {...adopted,  category, ...searchFilter, }; // Apply both category and search filter
 
         result = await petCollection.find(query).toArray();
       }
@@ -138,6 +140,22 @@ async function run() {
       }
 
       res.send(result)
+    })
+
+    app.get('/category-all-pets', async(req, res)=>{
+      const category = req.query.category;
+      console.log(category.toLowerCase());
+      let result;
+      if(category){
+        let adopted = { adopted: false };
+        result = await petCollection.find({category: category.toLowerCase(),  adopted: false }).toArray()
+        return  res.send(result)
+      }
+      else{
+        result = await petCollection.find({ adopted: false }).sort({ date: -1 }).toArray()
+        return  res.send(result)
+      }
+     
     })
 
     app.get('/pet/:id', async (req, res) => {
