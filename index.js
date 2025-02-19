@@ -64,7 +64,6 @@ async function run() {
     }
 
     const verifyToken = (req, res, next) => {
-      // console.log("inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: "forbidden access" });
       }
@@ -131,7 +130,6 @@ async function run() {
 
       const category = req.query.category;
       const search = req.query.search;
-      console.log(category, search);
       let result;
 
       if (category && search) {
@@ -154,7 +152,6 @@ async function run() {
 
     app.get('/category-all-pets', async (req, res) => {
       const category = req.query.category;
-      console.log(category.toLowerCase());
       let result;
       if (category) {
         let adopted = { adopted: false };
@@ -229,7 +226,6 @@ async function run() {
     app.get('/donation', async (req, res) => {
       const email = req.query.email;
       const query = { user: email }
-      console.log(email);
       let result;
       if (email)
         result = await donationCollection.find(query).toArray()
@@ -245,7 +241,11 @@ async function run() {
     app.get('/donation/:id', async (req, res) => {
       const id = req.params.id;
       const result = await donationCollection.findOne({ _id: new ObjectId(id) })
-      const recomDonation = await donationCollection.find({ pause: false }).limit(3).toArray()
+      const recomDonation = await donationCollection
+        .find({ _id: { $ne: new ObjectId(id) } })
+        .limit(3)
+        .toArray();
+
       res.send({ result, recomDonation })
     })
 
@@ -377,7 +377,6 @@ async function run() {
         }
       }
       const updateCollectDonA = await donationCollection.updateOne({ _id: new ObjectId(data.donationId) }, updateDoc)
-      console.log(updateCollectDonA);
       res.send(result)
     })
 
@@ -389,7 +388,6 @@ async function run() {
 
     app.get('/payment-user/:id', verifyToken, async (req, res) => {
       const id = req.params.id;
-      console.log(id);
       const result = await paymentCollection.find({ donationId: id }).toArray()
       res.send(result)
     })
@@ -402,7 +400,6 @@ async function run() {
         const adoptUser = await adoptPetCollection.find({ petId: i._id.toString() }).toArray()
         result.push(adoptUser)
       }
-      console.log(result);
       res.send(result)
     })
 
@@ -439,9 +436,82 @@ async function run() {
       res.send(result)
     })
 
+
+    app.get('/pets-scroll', async (req, res) => {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
+
+      const category = req.query.category;
+      const search = req.query.search || '';
+
+      let baseQuery = { adopted: false }
+      if (search) {
+        baseQuery = {
+          ...baseQuery, name: {
+            $regex: search, $options: 'i'
+          }
+        }
+
+        if (category && category !== 'all') {
+          baseQuery = { ...baseQuery, category }
+        }
+
+      }
+      const pets = await petCollection
+        .find(baseQuery)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      const totalPets = await petCollection.countDocuments(baseQuery);
+      const hasNextPage = skip + pets.length < totalPets;
+
+      res.status(200).json({
+        pets,
+        hasNextPage,
+      });
+
+    });
+
+    app.get('/count', async (req, res) => {
+      const totalpet = await petCollection.find().toArray()
+      const adoptedPet = await adoptPetCollection.find().toArray()
+      const availAbleDonation = await donationCollection.find({ pause: true }).toArray()
+      const users = await usersCollection.find().toArray()
+
+      const len = [
+        { icon: "🐕", value: totalpet.length, label: "Total Added Pets" },
+        { icon: "🏠", value: adoptedPet.length, label: "Adopted Pets" },
+        { icon: "🏅", value: availAbleDonation.length, label: "Available Donation" },
+        { icon: "👥", value: users.length, label: "Total Register Users" },
+      ];
+
+
+      res.send(len)
+    })
+
+    app.get('/category-product', async (req, res) => {
+      try {
+        const data = [
+          {name:'cats', value: await petCollection.countDocuments({ category: 'cats' })},
+          {name:'dogs', value: await petCollection.countDocuments({ category: 'dogs' })},
+          {name:'rabbits', value: await petCollection.countDocuments({ category: 'rabbits' })},
+          {name:'fish', value: await petCollection.countDocuments({ category: 'fish' })},
+          {name:'birds', value: await petCollection.countDocuments({ category: 'birds' })},
+          {name:'turtle', value: await petCollection.countDocuments({ category: 'turtle' })},
+          {name:'others', value: await petCollection.countDocuments({ category: 'others' })},
+      ];
+        
+        res.json(data);
+      } catch (error) {
+        console.error("Error fetching category counts:", error);
+        res.status(500).json({ message: "Internal Server Error" });
+      }
+    })
+
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
-    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
